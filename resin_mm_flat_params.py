@@ -135,17 +135,23 @@ class Product_Strategy:
 class mm_Product_Strategy(Product_Strategy):
     def __init__(self):
         super().__init__()
+        # Adjustable Market making parameters
+        # - spread: The spread between the buy/sell and the fair price
+        # - custom_limit: The position that the trader considers extreme
+        # - liquidate_val: The price the trader utilizes to liquidate their position
         self.custom_limit: int
         self.spread: int
+        self.liquidate_val: int
         
     # Calculate the fair value of the product and return
     @abstractmethod
     def fairValue(self, state: TradingState) -> int:
         pass
     # Generalize purchases of Market making based off adjustable parameters:
-    # - custom_limit: The position that the trader wants to hold in [0:self.limit]
+    # - custom_limit: The position that the trader considers extreme
     # - spread: The spread between the buy/sell and the fair price
     # - fair_price: the price the trader values the product at
+    # - liquidate_val: The price the trader utilizes to liquidate their position
     def makeOrders(self, state: TradingState) -> list[Order]:
         # create list of orders to be returned
         orders = []
@@ -159,11 +165,11 @@ class mm_Product_Strategy(Product_Strategy):
         
         # Adjust fair buy and sell price from true fair price
         if current_position <= -self.custom_limit:
-            fair_buy_price = fair_price
+            fair_buy_price = fair_price + self.liquidate_val
         else: 
             fair_buy_price = fair_price - self.spread
         if current_position >= self.custom_limit:
-            fair_sell_price = fair_price
+            fair_sell_price = fair_price - self.liquidate_val
         else:
             fair_sell_price = fair_price + self.spread
         
@@ -186,11 +192,11 @@ class mm_Product_Strategy(Product_Strategy):
 
         # Re-Adjust fair buy and sell price from true fair price
         if current_position <= -self.custom_limit:
-            fair_buy_price = fair_price
+            fair_buy_price = fair_price + self.liquidate_val
         else: 
             fair_buy_price = fair_price - self.spread
         if current_position >= self.custom_limit:
-            fair_sell_price = fair_price
+            fair_sell_price = fair_price - self.liquidate_val
         else:
             fair_sell_price = fair_price + self.spread
         
@@ -216,15 +222,19 @@ class Rainforest_Resin_Strategy(mm_Product_Strategy):
     def __init__(self):
         super().__init__()
         self.productSymbol = "RAINFOREST_RESIN"
-        self.custom_limit = 15
-        self.spread = 2 
         self.limit = 50
+        # Set the adjustable parameters for the strategy
+        self.spread = 2
+        self.custom_limit = 15
+        self.liquidate_val = 0
+
+    # Static fair value of 10000
     def fairValue(self, state: TradingState) -> int:
         return 10000
 
 
-
-
+strategies = dict[Symbol: Product_Strategy]()
+strategies["RAINFOREST_RESIN"] = Rainforest_Resin_Strategy()
 logger = Logger()
 
 class Trader:
@@ -233,8 +243,6 @@ class Trader:
         result = {}
         conversions = 0
         trader_data = ""
-        strategies = dict[Symbol: Product_Strategy]()
-        strategies["RAINFOREST_RESIN"] = Rainforest_Resin_Strategy()
         
         for product in state.market_trades.keys():
             if product not in strategies:
